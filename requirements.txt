@@ -1,7 +1,6 @@
 flask
+requests
 supabase
-undetected-chromedriver
-selenium
 gunicorn
 setuptools
 
