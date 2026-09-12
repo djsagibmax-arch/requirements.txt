@@ -4,16 +4,16 @@ import requests
 
 app = Flask(__name__)
 
-# মেটা থেকে পাওয়া ক্রেডেনশিয়ালস
+# মেটা থেকে পাওয়া আপনার ক্রেডেনশিয়ালস
 TOKEN = os.getenv("WHATSAPP_TOKEN", "EAAOibJc4tZAwBSQ1qVin0onZCjscUTHypCVjIxHvBPEEp46HJh3g5KQKN2ZB39zsF7REXsgk1cPDlLExgYJEHU0ORYZBkjZCTIGa6AbfB28DAOqNLumbZCzcqkEs2wWzeZBqr59ZAZCek8EqHISzAkHuzDJRmhFL90DYZB0a6mn4Ekyg9QpxkA35ZANuwMdfKqmyQZDZD")
 PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID", "1243931905479404")
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "technography_verify_token")
 
 @app.route("/", methods=["GET"])
 def home():
-    return "WhatsApp Bot is running successfully!"
+    return "WhatsApp Supabase Order Bot is running successfully!"
 
-# ১. মেটা থেকে আসা ওয়েবহুক ভেরিফাই করার জন্য (Webhook Verification)
+# হোয়াটসঅ্যাপ ওয়েবহুক ভেরিফিকেশন (যদি প্রয়োজন হয়)
 @app.route("/webhook", methods=["GET"])
 def verify_webhook():
     mode = request.args.get("hub.mode")
@@ -27,35 +27,38 @@ def verify_webhook():
             return "Verification failed", 403
     return "Hello World", 200
 
-# ২. কাস্টমারের মেসেজ রিসিভ করা এবং অটো রিপ্লাই পাঠানোর মেইন ফাংশন
-@app.route("/webhook", methods=["POST"])
-def webhook():
+# পেমেন্ট টেবিল বা ডেটাবেস থেকে ট্রিগার হয়ে হোয়াটসঅ্যাপে কনফার্মেশন পাঠানোর রাউট
+@app.route("/send-confirmation", methods=["POST"])
+def send_confirmation():
     data = request.json
-    print("Received Data:", data)
+    print("Received Data from Payment Table:", data)
 
     try:
-        if "entry" in data:
-            for entry in data["entry"]:
-                for change in entry.get("changes", []):
-                    value = change.get("value", {})
-                    if "messages" in value:
-                        phone_number_id = value["metadata"]["phone_number_id"]
-                        message = value["messages"][0]
-                        from_number = message["from"] # কাস্টমারের হোয়াটসঅ্যাপ নম্বর
-                        msg_body = message["text"]["body"] # কাস্টমার কী লিখেছে
+        # পেমেন্ট টেবিল বা ডেটাবেস থেকে আসা কাস্টমার ডাটা
+        customer_phone = data.get("phone")  # কাস্টমারের হোয়াটসঅ্যাপ নম্বর
+        customer_name = data.get("name", "গ্রাহক")
+        product_name = data.get("product", "ডিজিটাল প্রোডাক্ট")
+        download_link = data.get("link", "https://yourwebsite.com/download")
 
-                        print(f"Message from {from_number}: {msg_body}")
+        if not customer_phone:
+            return jsonify({"status": "error", "message": "Phone number not found in data"}), 400
 
-                        # কাস্টমারকে কী উত্তর পাঠাবেন
-                        reply_text = "স্বাগতম! আমাদের ডিজিটাল প্রোডাক্ট এবং সফটওয়্যার সম্পর্কে জানতে যোগাযোগ করার জন্য ধন্যবাদ। খুব শীঘ্রই আমাদের প্রতিনিধি আপনার সাথে কথা বলবে।"
+        # হোয়াটসঅ্যাপে পাঠানোর জন্য কনফার্মেশন মেসেজ তৈরি
+        message_text = (
+            f"ধন্যবাদ {customer_name}! পেমেন্ট সফলভাবে সম্পন্ন হয়েছে।\n\n"
+            f"📦 প্রোডাক্ট: {product_name}\n"
+            f"🔗 ডাউনলোডের লিংক: {download_link}\n\n"
+            f"আপনার অর্ডারটি কনফার্ম করা হলো।"
+        )
 
-                        # হোয়াটসঅ্যাপে মেসেজ পাঠানোর ফাংশন কল করা
-                        send_whatsapp_message(phone_number_id, from_number, reply_text)
+        # হোয়াটসঅ্যাপ এপিআই-এর মাধ্যমে মেসেজ পাঠানো
+        response = send_whatsapp_message(PHONE_NUMBER_ID, customer_phone, message_text)
+
+        return jsonify({"status": "success", "response": response}), 200
 
     except Exception as e:
-        print("Error processing webhook:", e)
-
-    return jsonify({"status": "success"}), 200
+        print("Error in sending confirmation:", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 def send_whatsapp_message(phone_number_id, recipient_number, message_text):
     headers = {
@@ -70,7 +73,7 @@ def send_whatsapp_message(phone_number_id, recipient_number, message_text):
         "text": {"body": message_text},
     }
     response = requests.post(url, json=payload, headers=headers)
-    print("Send Response:", response.json())
+    return response.json()
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)))
