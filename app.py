@@ -7,7 +7,7 @@ app = Flask(__name__)
 CORS(app)  # CORS এনাবল করা হলো যাতে ওয়েবসাইট থেকে রিকোয়েস্ট ব্লক না হয়
 
 # মেটা থেকে পাওয়া আপনার ক্রেডেনশিয়ালস
-TOKEN = os.getenv("WHATSAPP_TOKEN", "EAAOibJc4tZAwBSQ1qVin0onZCjscUTHypCVjIxHvBPEEp46HJh3g5KQKN2ZB39zsF7REXsgk1cPDlLExgYJEHU0ORYZBkjZCTIGa6AbfB28DAOqNLumbZCzcqkEs2wWzeZBqr59ZAZCek8EqHISzAkHuzDJRmhFL90DYZB0a6mn4Ekyg9QpxkA35ZANuwMdfKqmyQZDZD")
+TOKEN = os.getenv("WHATSAPP_TOKEN", "আপনার_স্থায়ী_টোকেনটি_এখানে_বসান")
 PHONE_NUMBER_ID = os.getenv("PHONE_NUMBER_ID", "1243931905479404")
 VERIFY_TOKEN = os.getenv("VERIFY_TOKEN", "technography_verify_token")
 
@@ -39,20 +39,13 @@ def send_confirmation():
     try:
         customer_phone = data.get("phone")
         customer_name = data.get("name", "গ্রাহক")
-        product_name = data.get("product", "ডিজিটাল প্রোডাক্ট")
-        download_link = data.get("link", "https://yourwebsite.com/download")
+        download_link = data.get("link", "https://technographybd.xyz/mega-bundle-vip-access.html")
 
         if not customer_phone:
             return jsonify({"status": "error", "message": "Phone number not found in data"}), 400
 
-        message_text = (
-            f"ধন্যবাদ {customer_name}! পেমেন্ট সফলভাবে সম্পন্ন হয়েছে।\n\n"
-            f"📦 প্রোডাক্ট: {product_name}\n"
-            f"🔗 ডাউনলোডের লিংক: {download_link}\n\n"
-            f"আপনার অর্ডারটি কনফার্ম করা হলো।"
-        )
-
-        response = send_whatsapp_message(PHONE_NUMBER_ID, customer_phone, message_text)
+        # মেটার অনুমোদিত টেমপ্লেট দিয়ে মেসেজ পাঠানো
+        response = send_whatsapp_template(PHONE_NUMBER_ID, customer_phone, customer_name, download_link)
         print("WhatsApp API Response:", response)
 
         return jsonify({"status": "success", "response": response}), 200
@@ -61,18 +54,35 @@ def send_confirmation():
         print("Error in sending confirmation:", e)
         return jsonify({"status": "error", "message": str(e)}), 500
 
-def send_whatsapp_message(phone_number_id, recipient_number, message_text):
+def send_whatsapp_template(phone_number_id, recipient_number, customer_name, download_link):
     headers = {
         "Authorization": f"Bearer {TOKEN}",
         "Content-Type": "application/json",
     }
     url = f"https://graph.facebook.com/v18.0/{phone_number_id}/messages"
+    
+    # মেটা টেমপ্লেট পে-লোড (যা আপনার তৈরি করা order_delivery টেমপ্লেটকে কল করবে)
     payload = {
         "messaging_product": "whatsapp",
         "to": recipient_number,
-        "type": "text",
-        "text": {"body": message_text},
+        "type": "template",
+        "template": {
+            "name": "order_delivery",  # মেটাতে তৈরি করা টেমপ্লেটের নাম
+            "language": {
+                "code": "bn"
+            },
+            "components": [
+                {
+                    "type": "body",
+                    "parameters": [
+                        {"type": "text", "text": customer_name},  # {{1}} এর জায়গায় বসবে
+                        {"type": "text", "text": download_link}   # {{2}} এর জায়গায় বসবে
+                    ]
+                }
+            ]
+        }
     }
+    
     response = requests.post(url, json=payload, headers=headers)
     return response.json()
 
